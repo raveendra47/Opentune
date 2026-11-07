@@ -54,11 +54,37 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # A fork's own signing key, when its secrets are set; the release APKs in
+      # the apks artifact are then signed with it. Without it they stay
+      # debug-signed (a runner key that differs between runs).
+      - name: Keystore (when the signing secrets are set)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.OPENTUNE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "OPENTUNE_KEYSTORE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          else
+            echo "No signing keystore secret: release APKs stay debug-signed."
+          fi
+
       - name: Build, unit tests and lint
+        env:
+          OPENTUNE_KEYSTORE_PASSWORD: ${{ secrets.OPENTUNE_KEYSTORE_PASSWORD }}
+          OPENTUNE_KEY_ALIAS: ${{ secrets.OPENTUNE_KEY_ALIAS }}
+          OPENTUNE_KEY_PASSWORD: ${{ secrets.OPENTUNE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
 
       - name: Release build (R8 shrinking)
+        env:
+          OPENTUNE_KEYSTORE_PASSWORD: ${{ secrets.OPENTUNE_KEYSTORE_PASSWORD }}
+          OPENTUNE_KEY_ALIAS: ${{ secrets.OPENTUNE_KEY_ALIAS }}
+          OPENTUNE_KEY_PASSWORD: ${{ secrets.OPENTUNE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
 
       - name: Test and lint reports
         if: always()

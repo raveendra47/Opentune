@@ -87,11 +87,14 @@ jobs:
         if: steps.version.outputs.skip != 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          CERT_SHA256: ${{ secrets.OPENTUNE_CERT_SHA256 }}
         run: |
           set -euo pipefail
+          test -n "$CERT_SHA256" || { echo '::error::Set OPENTUNE_CERT_SHA256 (the "Signer #1 certificate SHA-256 digest" printed by Create signing keystore).'; exit 1; }
           for apk in app/build/outputs/apk/release/*.apk; do
             certificate="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk")"
-            printf '%s\n' "$certificate" | grep -F 'Signer #1 certificate SHA-256 digest: 23e77142d7f0ae4d65e5e5a3dccb8e735c0042e93ffd29ab5fafe2521ab5d5a2'
+            # A fork signs with its own key: the digest comes from OPENTUNE_CERT_SHA256.
+            printf '%s\n' "$certificate" | grep -F "Signer #1 certificate SHA-256 digest: $CERT_SHA256"
             "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | sed -n '1p' > "$RUNNER_TEMP/apk-version.txt"
             grep -F "versionName='${TAG#v}'" "$RUNNER_TEMP/apk-version.txt"
           done
