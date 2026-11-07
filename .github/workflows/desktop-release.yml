@@ -28,10 +28,9 @@ concurrency:
 
 jobs:
   # Which release, and the commit it was built from.
+  # This fork ships the Android app only: no desktop downloads on its releases.
   release:
-    if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
+    if: false
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.find.outputs.tag }}
