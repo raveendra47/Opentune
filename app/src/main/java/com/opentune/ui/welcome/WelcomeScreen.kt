@@ -324,7 +324,7 @@ private val TOP_BAR = 72.dp
 private val BOTTOM_BAR = 112.dp
 
 @Composable
-private fun BoxScope.WelcomeTopBar(step: WelcomeStep,     onBack: () -> Unit, onSkip: () -> Unit, reduceMotion: Boolean) {
+private fun BoxScope.WelcomeTopBar(step: WelcomeStep, onBack: () -> Unit, onSkip: () -> Unit, reduceMotion: Boolean) {
     Box(
         Modifier.align(Alignment.TopCenter).fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
@@ -333,7 +333,8 @@ private fun BoxScope.WelcomeTopBar(step: WelcomeStep,     onBack: () -> Unit, on
     ) {
         AnimatedVisibility(step != WelcomeStep.MUSIC, Modifier.align(Alignment.CenterStart), enter = fadeIn(), exit = fadeOut()) {
             GlassBackButton(onBack)
-        }        StepDots(step, reduceMotion, Modifier.align(Alignment.Center))
+        }
+        StepDots(step, reduceMotion, Modifier.align(Alignment.Center))
         AnimatedVisibility(step == WelcomeStep.ARTISTS, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
             Surface(
                 onClick = onSkip,
