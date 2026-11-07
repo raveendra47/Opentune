@@ -226,6 +226,7 @@ fun LibraryScreen(contentPadding: PaddingValues, actions: SongActions, nav: Libr
     val signedIn by AccountStore.signedIn.collectAsState()
     val account by AccountStore.account.collectAsState()
     val libraryUi by AppSettings.ui.collectAsState()
+    val playbackUi by AppSettings.playback.collectAsState()
     val yearStart = remember {
         Calendar.getInstance().apply { set(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0) }.timeInMillis
     }
@@ -293,7 +294,7 @@ fun LibraryScreen(contentPadding: PaddingValues, actions: SongActions, nav: Libr
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Shortcut(Icons.Rounded.Favorite, "Liked", "${liked.size} songs", nav.liked, Modifier.weight(1f))
-                    Shortcut(Icons.Rounded.Download, "Downloads", if (doneCount == 0) "Offline songs" else "$doneCount songs", nav.downloads, Modifier.weight(1f))
+                    if (!playbackUi.localOnly) Shortcut(Icons.Rounded.Download, "Downloads", if (doneCount == 0) "Offline songs" else "$doneCount songs", nav.downloads, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Shortcut(Icons.Rounded.LibraryMusic, "On this phone", "Local files", nav.local, Modifier.weight(1f))
@@ -301,7 +302,7 @@ fun LibraryScreen(contentPadding: PaddingValues, actions: SongActions, nav: Libr
                 }
                 val server by Subsonic.server.collectAsState()
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Shortcut(Icons.Rounded.Radio, "Radio", "Live stations", nav.radio, Modifier.weight(1f))
+                    if (!playbackUi.localOnly) Shortcut(Icons.Rounded.Radio, "Radio", "Live stations", nav.radio, Modifier.weight(1f))
                     Shortcut(
                         Icons.Rounded.Dns,
                         "Music server",

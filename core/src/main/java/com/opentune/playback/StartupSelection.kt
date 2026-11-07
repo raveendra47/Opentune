@@ -27,11 +27,11 @@ internal class StartupSelection(
     private val original: Uri,
     private val maximum: () -> Boolean = { AppSettings.effectiveAudioQuality == AudioQuality.MAX },
     /** Whether lossless is wanted at all, at any quality setting (an add-on can give it). */
-    private val losslessWanted: () -> Boolean = { ExternalStreams.allowed(true) },
+    private val losslessWanted: () -> Boolean = { !AppSettings.playback.value.localOnly && ExternalStreams.allowed(true) },
     /** A stream picked by hand in Search's Add-ons tab for this song, if there is one. */
     private val picked: (String) -> ExternalStreams.Rendition? = { id -> ExternalStreams.cached(id)?.takeIf { it.picked } },
     /** Whether JioSaavn may be tried before YouTube's own stream: whenever external sources are allowed, not only at Max. */
-    private val saavnWanted: () -> Boolean = { ExternalStreams.allowed(false) },
+    private val saavnWanted: () -> Boolean = { !AppSettings.playback.value.localOnly && ExternalStreams.allowed(false) },
     private val lookupBudgetMs: Long = 6_000L,
     private val findJioSaavn: suspend (Song, Long) -> ExternalStreams.Rendition? = ExternalStreams::findJioSaavn,
     private val cached: (String) -> ExternalStreams.Rendition? = ExternalStreams::cached,

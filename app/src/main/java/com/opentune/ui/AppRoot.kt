@@ -152,9 +152,15 @@ fun AppRoot(vm: PlayerViewModel) {
     // Scrolling any page down folds the bottom bar into one row; scrolling up unfolds it.
     val chromeScroll = rememberChromeScroll()
     val chromeUi by com.opentune.data.settings.AppSettings.ui.collectAsState()
+    // Local-only mode keeps the streaming tabs off the dock and out of the menus.
+    val playbackUi by com.opentune.data.settings.AppSettings.playback.collectAsState()
+    val localOnly = playbackUi.localOnly
     // Explore without a tab of its own lives on the Search page instead.
     val separateExplore = chromeUi.separateExplore
-    val dockTabs = remember(separateExplore) { if (separateExplore) Tab.entries.toList() else Tab.entries - Tab.EXPLORE }
+    val dockTabs = remember(separateExplore, localOnly) {
+        val base = if (separateExplore) Tab.entries.toList() else Tab.entries - Tab.EXPLORE
+        if (localOnly) base - Tab.EXPLORE - Tab.PODCASTS else base
+    }
     val chromeTabs = remember(dockTabs) { dockTabs.map { ChromeTab(it.label, it.icon, it.selectedIcon) } }
     // A page opened from inside the player (the artist, from a tap on their
     // name) folds the player away; back from that page opens the player
@@ -243,14 +249,17 @@ fun AppRoot(vm: PlayerViewModel) {
     val route = entry?.destination?.route
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     // Explore's tab turned off while on it: back to Home, Explore is on the Search page now.
-    LaunchedEffect(separateExplore) {
-        if (!separateExplore && tab == Tab.EXPLORE) {
+    // Also in local-only mode, where Explore and Podcasts have no tab at all.
+    LaunchedEffect(separateExplore, localOnly) {
+        val hidden = if (localOnly) tab == Tab.EXPLORE || tab == Tab.PODCASTS else !separateExplore && tab == Tab.EXPLORE
+        if (hidden) {
+            val fromRoute = route
             tab = Tab.HOME
-            if (route == Tab.EXPLORE.route) nav.popBackStack(Tab.HOME.route, inclusive = false)
+            if (fromRoute != null && fromRoute != Tab.HOME.route) nav.popBackStack(Tab.HOME.route, inclusive = false)
         }
     }
     LaunchedEffect(route) {
-        Tab.entries.firstOrNull { it.route == route }?.let { tab = it }
+        dockTabs.firstOrNull { it.route == route }?.let { tab = it }
         chromeScroll.expand()
     }
     LaunchedEffect(playbackError) { playbackError?.let { com.opentune.data.Pills.error(it) } }
@@ -385,7 +394,14 @@ fun AppRoot(vm: PlayerViewModel) {
     // Links opened from outside: a song plays with its radio, anything else opens its page.
     val incoming by Links.incoming.collectAsState()
     LaunchedEffect(incoming) {
-        when (val link = incoming) {
+        val link = incoming ?: return@LaunchedEffect
+        // Local-only mode: shared YouTube/Spotify links are streaming, so they are refused at the door.
+        if (localOnly && link !is LinkTarget.Recognize && link !is LinkTarget.Player) {
+            com.opentune.data.Pills.error("Local-only: links to other services don't play here")
+            Links.consumed()
+            return@LaunchedEffect
+        }
+        when (link) {
             is LinkTarget.Song -> {
                 vm.player.connected.first { it }
                 val queue = runCatching { MusicRepository.watchQueue(link.videoId) }.getOrDefault(emptyList())
@@ -671,7 +687,7 @@ fun AppRoot(vm: PlayerViewModel) {
                             onOpenList = { list ->
                                 list.playlistId?.let { nav.navigate("playlist/${Uri.encode(it)}") } ?: list.browseId?.let { nav.openBrowse(it) }
                             },
-                            explore = if (separateExplore) null else ({
+                            explore = if (separateExplore || localOnly) null else ({
                                 ExploreScreen(content, onMoodClick = openMood, onItemClick = openItem, showHeader = false)
                             }),
                         )

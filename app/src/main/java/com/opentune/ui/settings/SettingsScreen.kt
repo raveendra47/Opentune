@@ -712,8 +712,8 @@ private fun settingsSections(
         FloatingDialog(onDismissRequest = { message = null }, confirmButton = { SheetButton("OK", onClick = { message = null }, closes = true) }, text = { Text(m) })
     }
 
-    return listOf(
-        Section(
+    return listOfNotNull(
+        if (pb.localOnly) null else Section(
             "Account",
             listOfNotNull(
                 Entry("YouTube Music account", "sign in login google profile switch add") {
@@ -1311,7 +1311,7 @@ private fun settingsSections(
                 },
             ),
         ),
-        Section(
+        if (pb.localOnly) null else Section(
             "Downloads",
             listOf(
                 Entry("Downloaded songs", "offline saved") {
@@ -1497,7 +1497,7 @@ private fun settingsSections(
                 } else null,
             ),
         ),
-        Section(
+        if (pb.localOnly) null else Section(
             "Import",
             listOf(
                 Entry("Import a playlist", "spotify youtube music import playlist album link csv exportify transfer migrate") {
@@ -1531,6 +1531,14 @@ private fun settingsSections(
         Section(
             "Advanced",
             listOf(
+                Entry("Local-only mode", "local files offline only no streaming youtube music google account sign out phone storage") {
+                    ToggleRow(
+                        "Local-only mode",
+                        pb.localOnly,
+                        { v -> AppSettings.updatePlayback { it.copy(localOnly = v) } },
+                        summary = "Plays only the audio files on this phone: the streaming tabs, sign-in, downloads and links to other services are taken out, and nothing is asked of YouTube or Spotify. Songs already on the phone keep playing",
+                    )
+                },
                 Entry("What's new", "release notes changelog version highlights") {
                     NavRow("What's new", { showWhatsNew = true }, summary = "Highlights and improvements in ${BuildConfig.VERSION_NAME}", icon = Icons.Rounded.SystemUpdate)
                 },

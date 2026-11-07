@@ -312,6 +312,12 @@ object StreamResolver {
      * outside the buffer, and each range the cache fills in.
      */
     suspend fun resolve(videoId: String): String {
+        // Local-only mode: the last wall before any network stream plays. Everything
+        // upstream already keeps streaming-only songs out of the queue; this fails even
+        // a stray one fast, before any YouTube request goes out to look for one.
+        if (AppSettings.playback.value.localOnly) {
+            throw PermanentlyUnplayableException("Local-only: this app plays only the songs on this phone")
+        }
         init
 
         recent[videoId]
@@ -852,6 +858,9 @@ object StreamResolver {
         maxKbps: Int,
         requireM4a: Boolean = false,
     ): Stream {
+        if (AppSettings.playback.value.localOnly) {
+            throw IOException("Local-only: downloads are streaming-based and are off in this build")
+        }
         val stream = downloadStream(videoId, maxKbps, requireM4a)
         val allowed = if (requireM4a) setOf("m4a") else setOf("m4a", "webm")
         check(stream.downloadExtension in allowed) {

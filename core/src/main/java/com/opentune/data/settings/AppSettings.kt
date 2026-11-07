@@ -333,6 +333,13 @@ data class PlaybackSettings(
     val sponsorBlock: Boolean = true,
     /** SponsorBlock categories to skip, by API name. */
     val sponsorBlockCategories: Set<String> = DEFAULT_SPONSORBLOCK_CATEGORIES,
+    /**
+     * Local-only mode: the app plays only the audio files on this phone. Every
+     * streaming surface (Explore, Podcasts, sign-in) is taken out of the dock and
+     * the menus, and any stray stream request fails before a byte is asked for.
+     * The first-run welcome then asks where the songs are.
+     */
+    val localOnly: Boolean = true,
 )
 
 val DEFAULT_SPONSORBLOCK_CATEGORIES = setOf("music_offtopic", "sponsor", "selfpromo", "interaction")
