@@ -26,9 +26,45 @@ object LocalMusic {
 
     data class Track(val song: Song, val folder: String, val mimeType: String?, val durationMs: Long, val isMusic: Boolean)
 
+    /**
+     * The folder prefixes the library covers, as MediaStore relative paths ("Music/Pop/").
+     * Entries from the SAF picker are decoded from their tree URIs; a plain entry is a
+     * relative path as saved by the old single-folder choice. Empty means every folder on
+     * the phone, or just the old single one when that is set.
+     */
+    fun chosenPrefixes(settings: LibrarySettings): List<String> {
+        if (settings.localFolders.isEmpty()) return settings.localFolder?.let { listOf(it) } ?: emptyList()
+        return settings.localFolders.map(::folderPrefix).filter { it.isNotEmpty() }
+    }
+
+    /** A human name for a saved folder entry: the tree URI's path, or the path as saved. */
+    fun folderName(raw: String): String = folderPrefix(raw).removeSuffix("/")
+
+    /** A saved folder entry as a MediaStore relative-path prefix ("Music/Pop/"). */
+    fun folderPrefix(raw: String): String {
+        if (!raw.startsWith("content://")) return raw.takeIf { it.endsWith("/") } ?: "$raw/"
+        val decoded = Uri.decode(raw)
+        // "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FPop"
+        // → "primary:Music/Pop" → the volume name is dropped: MediaStore's RELATIVE_PATH has none.
+        val path = decoded.substringAfter("/tree/", "")
+            .substringBefore('/', "")
+            .substringAfter(':', "")
+            .trim('/')
+        return if (path.isEmpty()) "" else "$path/"
+    }
+
+    /** Whether a track's folder is wanted. No chosen folders means every folder on the phone, or just the old single one when that is set. */
+    fun wanted(settings: LibrarySettings, folder: String): Boolean {
+        if (folder == "") return false
+        val prefixes = chosenPrefixes(settings)
+        if (prefixes.isEmpty()) return settings.localFolder == null || folder == settings.localFolder
+        // Every prefix ends in "/", so "Music/Pop/" never matches "Music/Popsicle/".
+        return prefixes.any { folder.startsWith(it) }
+    }
+
     suspend fun tracks(context: Context, settings: LibrarySettings): List<Song> = withContext(Dispatchers.IO) {
         query(context)
-            .filter { settings.localFolder == null || it.folder == settings.localFolder }
+            .filter { wanted(settings, it.folder) }
             .filter { !settings.filterNonMusic || looksLikeMusic(it) }
             .map { it.song }
     }

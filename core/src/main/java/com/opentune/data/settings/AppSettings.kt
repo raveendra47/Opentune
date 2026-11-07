@@ -542,8 +542,14 @@ enum class LyricsAlign(val label: String) {
 
 @Serializable
 data class LibrarySettings(
-    /** A MediaStore relative path ("Music/"), or null for every folder. */
+    /** A MediaStore relative path ("Music/"), or null for every folder. The first-run choice; music folders add to it. */
     val localFolder: String? = null,
+    /**
+     * Folders picked in the SAF picker ("where is your music?"), stored as their tree URIs.
+     * When set, only these folders — and the ones under them — are shown as local music;
+     * an empty set falls back to [localFolder], then to every folder on the phone.
+     */
+    val localFolders: Set<String> = emptySet(),
     val filterNonMusic: Boolean = true,
     val songCacheMb: Int = 512,
     val downloadQuality: AudioQuality = AudioQuality.MAX,

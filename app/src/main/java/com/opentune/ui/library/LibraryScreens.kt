@@ -102,7 +102,7 @@ fun LocalMusicScreen(contentPadding: PaddingValues, actions: SongActions, onBack
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
     var songs by remember { mutableStateOf<List<Song>?>(null) }
-    LaunchedEffect(granted, library.localFolder, library.filterNonMusic) {
+    LaunchedEffect(granted, library.localFolder, library.localFolders, library.filterNonMusic) {
         if (granted) songs = runCatching { LocalMusic.tracks(context, library) }.getOrDefault(emptyList())
     }
 
@@ -126,7 +126,10 @@ fun LocalMusicScreen(contentPadding: PaddingValues, actions: SongActions, onBack
                 val list = songs.orEmpty()
                 item {
                     Text(
-                        "${list.size} songs" + (library.localFolder?.let { " in $it" } ?: ""),
+                        "${list.size} songs" + (when {
+                            library.localFolders.size > 1 -> " in chosen folders"
+                            else -> library.localFolder?.let { " in $it" } ?: ""
+                        }),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 20.dp),

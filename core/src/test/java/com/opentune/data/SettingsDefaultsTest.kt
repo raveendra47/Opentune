@@ -28,6 +28,8 @@ class SettingsDefaultsTest {
             assertFalse(settings.playback.losslessUnmeteredOnly)
             assertTrue(settings.lyrics.preferWordSynced)
             assertTrue(settings.lyrics.romanize)
+            // This fork starts as a local player: only the songs on the phone.
+            assertTrue(settings.playback.localOnly)
             assertEquals(LyricsSource.entries.toList(), settings.lyrics.ordered.map { it.source })
             assertTrue(settings.lyrics.ordered.all { it.enabled })
         }

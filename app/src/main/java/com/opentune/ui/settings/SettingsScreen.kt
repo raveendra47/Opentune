@@ -479,6 +479,14 @@ private fun settingsSections(
     var audioAddons by remember { mutableStateOf(false) }
     if (audioAddons) AudioAddonsSheet { audioAddons = false }
     var folderDialog by remember { mutableStateOf(false) }
+    var folderPicking by remember { mutableStateOf(false) }
+    val treePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        // A music folder picked in the system picker: the read stays across restarts.
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            AppSettings.updateLibrary { it.copy(localFolders = it.localFolders + uri.toString()) }
+        }
+    }
     var cacheBytes by remember { mutableLongStateOf(0L) }
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { cacheBytes = withContext(Dispatchers.IO) { AudioCache.usedBytes(context) } }
@@ -706,6 +714,34 @@ private fun settingsSections(
             },
             onSelect = { f -> AppSettings.updateLibrary { it.copy(localFolder = f) } },
             onDismiss = { folderDialog = false },
+        )
+    }
+    if (folderPicking) {
+        FloatingDialog(
+            onDismissRequest = { folderPicking = false },
+            title = { Text("Music folders") },
+            text = {
+                Column {
+                    Text(
+                        if (lib.localFolders.isEmpty())
+                            "Every audio folder on the phone is used. Add folders to play only those, and the folders inside them."
+                        else "Music plays from these folders and the folders inside them. Tap one to remove it.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    lib.localFolders.sorted().forEach { raw ->
+                        RowDivider()
+                        SettingRow(
+                            com.opentune.data.local.LocalMusic.folderName(raw).ifBlank { raw },
+                            summary = "Stored outside the app; removing it only takes it out of this list",
+                            icon = Icons.Rounded.Folder,
+                            onClick = { AppSettings.updateLibrary { it.copy(localFolders = it.localFolders - raw) } },
+                            trailing = { IconButton(onClick = { AppSettings.updateLibrary { it.copy(localFolders = it.localFolders - raw) } }) { Icon(Icons.Rounded.Close, "Remove folder") } },
+                        )
+                    }
+                }
+            },
+            confirmButton = { SheetButton("Add a folder", onClick = { treePicker.launch(null) }, closes = true) },
+            dismissButton = { SheetButton("Done", onClick = { folderPicking = false }, closes = true) },
         )
     }
     message?.let { m ->
@@ -1360,12 +1396,24 @@ private fun settingsSections(
         ),
         Section(
             "Local music",
-            listOf(
-                Entry("Local music folder", "device files") {
-                    NavRow("Local music folder", { folderDialog = true }, summary = lib.localFolder ?: "All audio folders", icon = Icons.Rounded.Folder)
+            listOfNotNull(
+                Entry("Music folders", "device files folders storage where music located pick add") {
+                    NavRow(
+                        "Music folders",
+                        { folderPicking = true },
+                        summary = when {
+                            lib.localFolders.isEmpty() -> lib.localFolder ?: "All audio folders"
+                            lib.localFolders.size == 1 -> "One folder chosen"
+                            else -> "${lib.localFolders.size} folders chosen"
+                        },
+                        icon = Icons.Rounded.Folder,
+                    )
                 },
-                Entry("Filter non-music audio", "recordings voice notes") {
+                if (pb.localOnly) null else Entry("Filter non-music audio", "recordings voice notes") {
                     ToggleRow("Filter non-music audio", lib.filterNonMusic, { v -> AppSettings.updateLibrary { it.copy(filterNonMusic = v) } }, summary = "Hides clips under 30 seconds, WAV files, voice notes, recordings and system sounds", icon = Icons.Rounded.FilterAlt)
+                },
+                if (pb.localOnly) null else Entry("Local music folder", "device files") {
+                    NavRow("Local music folder", { folderDialog = true }, summary = lib.localFolder ?: "All audio folders", icon = Icons.Rounded.Folder)
                 },
             ),
         ),

@@ -133,7 +133,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** The welcome's steps, in order. */
-internal enum class WelcomeStep { ARTISTS, LOOK, SIGN_IN }
+internal enum class WelcomeStep { MUSIC, ARTISTS, LOOK, SIGN_IN }
 
 /** Done needs this many picks; with none, the step can only be skipped. */
 internal const val MIN_PICKS = 1
@@ -157,7 +157,7 @@ fun WelcomeScreen(
 ) {
     val ui by AppSettings.ui.collectAsState()
     val context = LocalContext.current
-    var step by rememberSaveable { mutableStateOf(WelcomeStep.ARTISTS) }
+    var step by rememberSaveable { mutableStateOf(WelcomeStep.MUSIC) }
     val picks = rememberSaveable(saver = ArtistListSaver) { mutableStateListOf() }
     // The artists on offer, grown by the picks; kept here so going back to the step finds it as it was.
     val grid = rememberSaveable(saver = ArtistListSaver) { mutableStateListOf() }
@@ -219,7 +219,7 @@ fun WelcomeScreen(
         }
     }
 
-    BackHandler(enabled = signingIn || step != WelcomeStep.ARTISTS) {
+    BackHandler(enabled = signingIn || step != WelcomeStep.MUSIC) {
         if (signingIn) signingIn = false else step = WelcomeStep.entries[step.ordinal - 1]
     }
 
@@ -251,6 +251,7 @@ fun WelcomeScreen(
                     picks = picks,
                     onContinue = {
                         when (step) {
+                            WelcomeStep.MUSIC -> step = WelcomeStep.ARTISTS
                             WelcomeStep.ARTISTS -> { follow(); step = WelcomeStep.LOOK }
                             WelcomeStep.LOOK -> step = WelcomeStep.SIGN_IN
                             WelcomeStep.SIGN_IN -> if (AccountStore.signedIn.value) finish() else signingIn = true
@@ -270,6 +271,7 @@ fun WelcomeScreen(
                 label = "welcomeStep",
             ) { s ->
                 when (s) {
+                    WelcomeStep.MUSIC -> MusicStep()
                     WelcomeStep.ARTISTS -> ArtistsStep(
                         picks = picks,
                         grid = grid,
@@ -322,17 +324,16 @@ private val TOP_BAR = 72.dp
 private val BOTTOM_BAR = 112.dp
 
 @Composable
-private fun BoxScope.WelcomeTopBar(step: WelcomeStep, onBack: () -> Unit, onSkip: () -> Unit, reduceMotion: Boolean) {
+private fun BoxScope.WelcomeTopBar(step: WelcomeStep,     onBack: () -> Unit, onSkip: () -> Unit, reduceMotion: Boolean) {
     Box(
         Modifier.align(Alignment.TopCenter).fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .height(56.dp),
     ) {
-        AnimatedVisibility(step != WelcomeStep.ARTISTS, Modifier.align(Alignment.CenterStart), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(step != WelcomeStep.MUSIC, Modifier.align(Alignment.CenterStart), enter = fadeIn(), exit = fadeOut()) {
             GlassBackButton(onBack)
-        }
-        StepDots(step, reduceMotion, Modifier.align(Alignment.Center))
+        }        StepDots(step, reduceMotion, Modifier.align(Alignment.Center))
         AnimatedVisibility(step == WelcomeStep.ARTISTS, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
             Surface(
                 onClick = onSkip,
@@ -385,6 +386,7 @@ private fun BoxScope.WelcomeBottomBar(step: WelcomeStep, picks: List<ExploreFeed
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val label = when (step) {
+            WelcomeStep.MUSIC -> "Continue"
             WelcomeStep.ARTISTS -> when {
                 picked < MIN_PICKS -> "Pick an artist to start"
                 picked == 1 -> "Done · 1 artist"
@@ -425,7 +427,53 @@ private fun topInset() = WindowInsets.statusBars.asPaddingValues().calculateTopP
 @Composable
 private fun bottomInset() = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BOTTOM_BAR
 
-// ---- Step 1: artists ------------------------------------------------------
+// ---- Step 1: where the music is ------------------------------------------
+
+@Composable
+private fun MusicStep() {
+    val context = LocalContext.current
+    val lib by AppSettings.library.collectAsState()
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        // The read stays across restarts, as in Settings › Local music.
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            AppSettings.updateLibrary { it.copy(localFolders = it.localFolders + uri.toString()) }
+        }
+    }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Spacer(Modifier.height(topInset()))
+        StepTitle("Where is your music?", "Point at the folders your songs live in, or use every folder on the phone. Change it any time in Settings › Local music.")
+        if (lib.localFolders.isNotEmpty()) {
+            Label("Chosen folders")
+            lib.localFolders.sorted().forEach { raw ->
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        com.opentune.data.local.LocalMusic.folderName(raw).ifBlank { raw },
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { AppSettings.updateLibrary { it.copy(localFolders = it.localFolders - raw) } }) {
+                        Text("Remove")
+                    }
+                }
+            }
+        }
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = { picker.launch(null) }, shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                Text("Add a folder", style = MaterialTheme.typography.titleMedium)
+            }
+            TextButton(onClick = { AppSettings.updateLibrary { it.copy(localFolders = emptySet(), localFolder = null) } }) {
+                Text("Use the whole phone")
+            }
+        }
+        Spacer(Modifier.height(bottomInset()))
+    }
+}
+
+// ---- Step 2: artists ------------------------------------------------------
 
 @Composable
 private fun ArtistsStep(
